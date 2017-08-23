@@ -84,7 +84,6 @@ fn get_password(no_conf: bool) -> io::Result<String> {
     password = password.trim().to_owned();
 
     Ok(password)
-
 }
 
 fn main() {
