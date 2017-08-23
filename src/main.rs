@@ -20,6 +20,8 @@
 extern crate serde;
 extern crate serde_json;
 
+extern crate clap;
+
 extern crate futures;
 extern crate hyper;
 extern crate tokio_core;
@@ -33,6 +35,7 @@ use tokio_core::reactor::Core;
 use hyper::Client;
 
 mod rpc_run;
+mod cli;
 
 use rpc_run::execute;
 use rpc_run::commands::*;
@@ -81,41 +84,24 @@ fn get_password() -> io::Result<String> {
     }
 }
 
-enum Error {
-    Cli,
-    Uri(String),
-    Rpc(rpc_run::Error),
-}
-
-impl From<rpc_run::Error> for Error {
-    fn from(error: rpc_run::Error) -> Self {
-        Error::Rpc(error)
-    }
-}
-
 fn main() {
     if let Err(error) = real_main() {
         match error {
-            Error::Cli => eprintln!(
-                "Command line argument RPC URL required.\n\
-                 Example (testnet on localhost): `bitcoin-donation http://localhost:18332/`."
-            ),
-            Error::Uri(error) => eprintln!("RPC URL '{}' could not be parsed.", error),
-            Error::Rpc(rpc_run::Error::Http(error)) => eprintln!(
+            rpc_run::Error::Http(error) => eprintln!(
                 "Fatal error: \
                  HTTP error: '{}'.",
                 error
             ),
-            Error::Rpc(rpc_run::Error::Auth) => eprintln!(
+            rpc_run::Error::Auth => eprintln!(
                 "Fatal error: \
                  authentication failure."
             ),
-            Error::Rpc(rpc_run::Error::Json(error)) => eprintln!(
+            rpc_run::Error::Json(error) => eprintln!(
                 "Fatal error: \
                  json error: '{}'.",
                 error
             ),
-            Error::Rpc(rpc_run::Error::Rpc(error)) => eprintln!(
+            rpc_run::Error::Rpc(error) => eprintln!(
                 "Fatal error: \
                  RPC error: '{}'.",
                 error.message
@@ -125,12 +111,13 @@ fn main() {
     }
 }
 
-fn real_main() -> Result<(), Error> {
+fn real_main() -> Result<(), rpc_run::Error> {
     let mut core = Core::new().expect("Could not initialize tokio core");
     let client = Client::new(&core.handle());
 
-    let uri_raw = env::args().nth(1).ok_or(Error::Cli)?;
-    let uri = uri_raw.parse().map_err(|_| Error::Uri(uri_raw))?;
+    let matches = cli::build_cli().get_matches();
+
+    let uri = matches.value_of("uri").unwrap().parse().unwrap();
 
     // TODO: figure out how will this handle usernames and multi-wallet.
     let credentials: Basic = Basic {
