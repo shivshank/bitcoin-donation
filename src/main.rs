@@ -63,25 +63,28 @@ fn try_get_password_config() -> io::Result<Option<String>> {
 }
 
 /// Call `try_get_password_config`, if it fails get the password from `stdin`.
-fn get_password() -> io::Result<String> {
-    if let Ok(Some(password)) = try_get_password_config() {
-        Ok(password)
-    } else {
-        let stdin = stdin();
-        let stderr = stderr();
-        let mut stdin_lock = stdin.lock();
-        let mut stderr_lock = stderr.lock();
-
-        stderr_lock.write_all(b"Input RPC password: ")?;
-        stderr_lock.flush()?;
-
-        let mut password = String::new();
-        stdin_lock.read_line(&mut password)?;
-
-        password = password.trim().to_owned();
-
-        Ok(password)
+fn get_password(no_conf: bool) -> io::Result<String> {
+    if !no_conf {
+        if let Ok(Some(password)) = try_get_password_config() {
+            return Ok(password);
+        }
     }
+
+    let stdin = stdin();
+    let stderr = stderr();
+    let mut stdin_lock = stdin.lock();
+    let mut stderr_lock = stderr.lock();
+
+    stderr_lock.write_all(b"Input RPC password: ")?;
+    stderr_lock.flush()?;
+
+    let mut password = String::new();
+    stdin_lock.read_line(&mut password)?;
+
+    password = password.trim().to_owned();
+
+    Ok(password)
+
 }
 
 fn main() {
@@ -119,10 +122,12 @@ fn real_main() -> Result<(), rpc_run::Error> {
 
     let uri = matches.value_of("uri").unwrap().parse().unwrap();
 
+    let no_conf = matches.is_present("no_conf");
+
     // TODO: figure out how will this handle usernames and multi-wallet.
     let credentials: Basic = Basic {
         username: String::new(),
-        password: Some(get_password().expect("Failed to get RPC password")),
+        password: Some(get_password(no_conf).expect("Failed to get RPC password")),
     };
 
     // This might fail if the key pool is empty and can not be replenished.

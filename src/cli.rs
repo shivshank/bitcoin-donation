@@ -47,4 +47,11 @@ pub fn build_cli<'a>() -> App<'a, 'a> {
                 .default_value("http://localhost:18332/")
                 .validator(validate_uri),
         )
+        .arg(
+            Arg::with_name("no_conf")
+                .short("n")
+                .long("no-config")
+                .help("Ignore the RPC password from the Bitcoin Core config file")
+                .takes_value(false),
+        )
 }
