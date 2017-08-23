@@ -126,7 +126,9 @@ fn real_main() -> Result<(), rpc_run::Error> {
     // TODO: figure out how will this handle usernames and multi-wallet.
     let credentials: Basic = Basic {
         username: String::new(),
-        password: Some(get_password(no_conf).expect("Failed to get RPC password")),
+        password: Some(
+            get_password(no_conf).expect("Failed to read RPC password from stdin."),
+        ),
     };
 
     // This might fail if the key pool is empty and can not be replenished.

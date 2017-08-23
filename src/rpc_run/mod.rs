@@ -90,15 +90,15 @@ pub fn execute<X: BitcoinCommand>(
         .set(ContentLength(encoded_input.len() as u64));
     request.set_body(encoded_input);
 
-    let check_status = client.request(request).map(
-        |response| match response.status() {
+    let check_status = client
+        .request(request)
+        .map(|response| match response.status() {
             StatusCode::Ok => Ok(response.body().concat2()),
             StatusCode::Unauthorized => Err(error::Error::Auth),
 
             // TODO: make the `Display` of this nicer.
             _ => Err(error::Error::Http(hyper::Error::Status)),
-        },
-    );
+        });
 
     // TODO: figure out if this can be merged with `check_status`. Improved performance?
     let work = core.run(check_status)??.map(|body: Chunk| {
