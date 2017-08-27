@@ -90,38 +90,42 @@ pub fn execute<X: BitcoinCommand>(
         .set(ContentLength(encoded_input.len() as u64));
     request.set_body(encoded_input);
 
-    let check_status = client
+    let work = client
         .request(request)
-        .map(|response| match response.status() {
-            StatusCode::Ok => Ok(response.body().concat2()),
+        // convert Hypers's error into our error type
+        .map_err(|err| err.into())
+        // pass on the response if status is okay, otherwise fail the future with our error
+        .and_then(|response| match response.status() {
+            StatusCode::Ok => Ok(response),
             StatusCode::Unauthorized => Err(error::Error::Auth),
-
             // TODO: make the `Display` of this nicer.
-            _ => Err(error::Error::Http(hyper::Error::Status)),
+            _ => Err(error::Error::Http(hyper::Error::Status))
+        })
+        // handle the response body (we know it's status is good now)
+        // also map hyper error into our error
+        .and_then(|response| {
+            response.body()
+                .concat2()
+                .map_err(|err| err.into())
+        })
+        .map(|body: Chunk| {
+            let rpc_output: RpcOutput<X::OutputFormat> = serde_json::from_slice(&body)?;
+
+            if rpc_output.id != id {
+                return Err(error::Error::Rpc(RpcError {
+                    code: -32_603,
+                    message: "Wrong ID returned.".to_owned(),
+                    data: None,
+                }));
+            }
+
+            rpc_output.result
+                .ok_or(error::Error::Rpc(rpc_output.error.unwrap_or(RpcError {
+                    code: -32_603, // TODO: figure out if this code is correct.
+                    message: "RPC error could not be retrieved.".to_owned(),
+                    data: None,
+                })))
         });
-
-    // TODO: figure out if this can be merged with `check_status`. Improved performance?
-    let work = core.run(check_status)??.map(|body: Chunk| {
-        let rpc_output: RpcOutput<X::OutputFormat> = serde_json::from_slice(&body)?;
-
-        if rpc_output.id != id {
-            return Err(error::Error::Rpc(RpcError {
-                code: -32_603,
-                message: "Wrong ID returned.".to_owned(),
-                data: None,
-            }));
-        }
-
-        if let Some(output) = rpc_output.result {
-            Ok(output)
-        } else {
-            Err(error::Error::Rpc(rpc_output.error.unwrap_or(RpcError {
-                code: -32_603, // TODO: figure out if this code is correct.
-                message: "RPC error could not be retrieved.".to_owned(),
-                data: None,
-            })))
-        }
-    });
 
     core.run(work)?
 }
