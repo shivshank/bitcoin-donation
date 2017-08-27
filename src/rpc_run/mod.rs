@@ -101,7 +101,7 @@ pub fn execute<X: BitcoinCommand>(
             // TODO: make the `Display` of this nicer.
             _ => Err(error::Error::Http(hyper::Error::Status))
         })
-        // handle the response body (we know it's status is good now)
+        // handle the response body (we know its status is good now)
         // also map hyper error into our error
         .and_then(|response| {
             response.body()
